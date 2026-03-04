@@ -1,11 +1,11 @@
 import { AIOutput, AIConfig } from './types';
 
-export async function generateContent(config: AIConfig, systemPrompt: string, userPrompt: string): Promise<AIOutput> {
+export async function generateContent(config: AIConfig, systemPrompt: string, userPrompt: string, maxTokens: number = 1024): Promise<AIOutput> {
   try {
     if (config.provider === 'openai') {
-      return await callOpenAI(config, systemPrompt, userPrompt);
+      return await callOpenAI(config, systemPrompt, userPrompt, maxTokens);
     } else {
-      return await callAnthropic(config, systemPrompt, userPrompt);
+      return await callAnthropic(config, systemPrompt, userPrompt, maxTokens);
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error occurred';
@@ -13,12 +13,12 @@ export async function generateContent(config: AIConfig, systemPrompt: string, us
   }
 }
 
-async function callOpenAI(config: AIConfig, system: string, user: string): Promise<AIOutput> {
+async function callOpenAI(config: AIConfig, system: string, user: string, maxTokens: number): Promise<AIOutput> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: config.model, max_tokens: 1024,
+      model: config.model, max_tokens: maxTokens,
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     }),
   });
@@ -34,7 +34,7 @@ async function callOpenAI(config: AIConfig, system: string, user: string): Promi
   return { status: 'success', text };
 }
 
-async function callAnthropic(config: AIConfig, system: string, user: string): Promise<AIOutput> {
+async function callAnthropic(config: AIConfig, system: string, user: string, maxTokens: number): Promise<AIOutput> {
   let response: Response;
   try {
     response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -46,7 +46,7 @@ async function callAnthropic(config: AIConfig, system: string, user: string): Pr
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: config.model, max_tokens: 1024,
+        model: config.model, max_tokens: maxTokens,
         system: system,
         messages: [{ role: 'user', content: user }],
       }),
@@ -71,7 +71,7 @@ export async function testConnection(config: AIConfig): Promise<{ success: boole
   const testConfig = { ...config };
   if (config.provider === 'openai') testConfig.model = 'gpt-4o-mini';
   if (config.provider === 'anthropic') testConfig.model = 'claude-haiku-4-5-20251001';
-  const result = await generateContent(testConfig, 'You are a test assistant.', 'Reply with the single word OK');
+  const result = await generateContent(testConfig, 'You are a test assistant.', 'Reply with the single word OK', 64);
   if (result.status === 'success') return { success: true, message: 'Connected successfully!' };
   return { success: false, message: result.status === 'error' ? result.message : 'Connection failed' };
 }

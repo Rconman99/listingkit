@@ -79,16 +79,19 @@ export const useAppStore = create<AppState>()(
           set({ progress: Math.round((completedCount / totalCalls) * 100), progressLabel: label });
         };
 
+        // Token limits per output type — social (3 posts) and video (scripted) need more room
+        const TOKEN_LIMITS = { mls: 1024, social: 2048, email: 1024, flyer: 1024, video: 2048 } as const;
+
         // Batch 1: MLS + Social + Email in parallel
-        const mlsP = generateContent(config, system, buildMlsPrompt(property)).then(r => { tick('MLS description ready...'); return r; });
-        const socialP = generateContent(config, system, buildSocialPrompt(property)).then(r => { tick('Social posts ready...'); return r; });
-        const emailP = generateContent(config, system, buildEmailPrompt(property)).then(r => { tick('Email blast ready...'); return r; });
+        const mlsP = generateContent(config, system, buildMlsPrompt(property), TOKEN_LIMITS.mls).then(r => { tick('MLS description ready...'); return r; });
+        const socialP = generateContent(config, system, buildSocialPrompt(property), TOKEN_LIMITS.social).then(r => { tick('Social posts ready...'); return r; });
+        const emailP = generateContent(config, system, buildEmailPrompt(property), TOKEN_LIMITS.email).then(r => { tick('Email blast ready...'); return r; });
 
         const [mlsRaw, socialRaw, emailRaw] = await Promise.allSettled([mlsP, socialP, emailP]);
 
         // Batch 2: Flyer + Video in parallel
-        const flyerP = generateContent(config, system, buildFlyerPrompt(property)).then(r => { tick('Flyer ready...'); return r; });
-        const videoP = generateContent(config, system, buildVideoPrompt(property)).then(r => { tick('Video script ready...'); return r; });
+        const flyerP = generateContent(config, system, buildFlyerPrompt(property), TOKEN_LIMITS.flyer).then(r => { tick('Flyer ready...'); return r; });
+        const videoP = generateContent(config, system, buildVideoPrompt(property), TOKEN_LIMITS.video).then(r => { tick('Video script ready...'); return r; });
 
         const [flyerRaw, videoRaw] = await Promise.allSettled([flyerP, videoP]);
 
@@ -145,7 +148,8 @@ export const useAppStore = create<AppState>()(
         // Make the API call
         const config: AIConfig = { provider: get().provider, apiKey: get().apiKey, model: get().model };
         const promptMap = { mls: buildMlsPrompt, social: buildSocialPrompt, email: buildEmailPrompt, flyer: buildFlyerPrompt, video: buildVideoPrompt };
-        const raw = await generateContent(config, SYSTEM_PROMPT, promptMap[outputKey](property));
+        const tokenLimits = { mls: 1024, social: 2048, email: 1024, flyer: 1024, video: 2048 } as const;
+        const raw = await generateContent(config, SYSTEM_PROMPT, promptMap[outputKey](property), tokenLimits[outputKey]);
 
         // Get fresh results reference
         const updated = { ...get().results! };
