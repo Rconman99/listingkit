@@ -65,11 +65,13 @@ export interface PropertyInput {
   brokerageName: string;
 }
 
-// === AI Config ===
-export interface AIConfig {
-  provider: 'openai' | 'anthropic';
-  apiKey: string;
-  model: string;
+// === Credit info from server ===
+export interface CreditInfo {
+  tier: 'free' | 'pro';
+  used: number;
+  remaining: number;
+  limit: number;
+  resetDate?: string;
 }
 
 // === History ===

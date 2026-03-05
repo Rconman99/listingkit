@@ -20,19 +20,19 @@ export default function LoadingState() {
       {/* Progress bar */}
       <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden">
         <div
-          className="bg-emerald-600 h-3 rounded-full transition-all duration-500 ease-out"
-          style={{ width: `${progress}%` }}
+          className="bg-emerald-600 h-3 rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${Math.min(progress, 100)}%` }}
         />
       </div>
 
       {/* Progress text */}
       <div className="flex items-center justify-between text-sm">
         <span className="text-gray-600">{progressLabel}</span>
-        <span className="font-semibold text-emerald-700">{progress}%</span>
+        <span className="font-semibold text-emerald-700">{Math.round(Math.min(progress, 100))}%</span>
       </div>
 
       <p className="text-gray-400 text-xs mt-6">
-        Generating 5 marketing outputs in parallel...
+        Generating your complete marketing kit...
       </p>
     </div>
   );

@@ -1,5 +1,7 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAppStore } from '../store/appStore';
+import CreditBadge from './CreditBadge';
 
 interface Props {
   children: ReactNode;
@@ -14,6 +16,11 @@ const navLinks = [
 export default function Layout({ children }: Props) {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const fetchCredits = useAppStore((s) => s.fetchCredits);
+
+  useEffect(() => {
+    fetchCredits();
+  }, [fetchCredits]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -24,7 +31,7 @@ export default function Layout({ children }: Props) {
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex gap-1">
+          <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
               <Link
                 key={link.to}
@@ -38,6 +45,9 @@ export default function Layout({ children }: Props) {
                 {link.label}
               </Link>
             ))}
+            <div className="ml-2">
+              <CreditBadge />
+            </div>
           </div>
 
           {/* Mobile hamburger */}
@@ -80,7 +90,7 @@ export default function Layout({ children }: Props) {
       <main className="flex-1">{children}</main>
 
       <footer className="border-t border-gray-200 py-6 text-center text-sm text-gray-500">
-        <p>Built by licensed real estate agents &middot; Powered by your API key</p>
+        <p>Built by licensed real estate agents</p>
       </footer>
     </div>
   );

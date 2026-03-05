@@ -71,11 +71,11 @@ export default function Home() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
               <div className="w-12 h-12 mx-auto mb-4 bg-emerald-100 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                 </svg>
               </div>
-              <h3 className="font-bold text-navy mb-2">Your Key, Your Data</h3>
-              <p className="text-sm text-gray-500">Your API key stays in your browser. We never see, store, or transmit it.</p>
+              <h3 className="font-bold text-navy mb-2">No Setup Required</h3>
+              <p className="text-sm text-gray-500">No API keys, no configuration. Just sign up and start generating instantly.</p>
             </div>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function Home() {
         >
           Start Generating Free
         </Link>
-        <p className="text-sm text-gray-400 mt-4">Built by licensed real estate agents</p>
+        <p className="text-sm text-gray-400 mt-4">3 free generations, then $9.99/month</p>
       </section>
     </div>
   );

@@ -1,20 +1,19 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { safeStorage, addToHistory } from '../lib/storage';
-import { PropertyInput, GenerationResult, AIConfig, AIOutput, SocialOutput, EmailOutput } from '../lib/types';
-import { generateContent } from '../lib/ai';
-import { SYSTEM_PROMPT, buildMlsPrompt, buildSocialPrompt, buildEmailPrompt, buildFlyerPrompt, buildVideoPrompt } from '../lib/prompts';
-import { parseSocialOutput, parseEmailOutput } from '../lib/parsers';
+import { PropertyInput, GenerationResult, CreditInfo, SocialOutput, EmailOutput } from '../lib/types';
+import { generateViaProxy, regenerateViaProxy, getCredits } from '../lib/ai';
 import { generateId } from '../lib/utils';
 
 interface AppState {
   // Settings (persisted)
-  apiKey: string;
-  provider: 'openai' | 'anthropic';
-  model: string;
+  sessionId: string;
   agentName: string;
   brokerageName: string;
   defaultTone: string;
+
+  // Credits
+  credits: CreditInfo | null;
 
   // Generation state (NOT persisted — transient)
   step: 0 | 1 | 2;
@@ -26,107 +25,78 @@ interface AppState {
   error: string | null;
 
   // Actions
-  setApiKey: (key: string) => void;
-  setProvider: (p: 'openai' | 'anthropic') => void;
-  setModel: (m: string) => void;
   setAgentName: (n: string) => void;
   setBrokerageName: (n: string) => void;
   setDefaultTone: (t: string) => void;
+  fetchCredits: () => Promise<void>;
   generate: (property: PropertyInput) => Promise<void>;
   regenerateOutput: (outputKey: 'mls' | 'social' | 'email' | 'flyer' | 'video') => Promise<void>;
   clearResults: () => void;
   resetToForm: () => void;
 }
 
+function ensureSessionId(): string {
+  return generateId();
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       // Defaults
-      apiKey: '', provider: 'openai', model: 'gpt-4o',
+      sessionId: ensureSessionId(),
       agentName: '', brokerageName: '', defaultTone: 'Professional',
+      credits: null,
       step: 0 as const, isGenerating: false, progress: 0, progressLabel: '',
       results: null, currentProperty: null, error: null,
 
       // Setters
-      setApiKey: (apiKey) => set({ apiKey }),
-      setProvider: (provider) => set({ provider }),
-      setModel: (model) => set({ model }),
       setAgentName: (agentName) => set({ agentName }),
       setBrokerageName: (brokerageName) => set({ brokerageName }),
       setDefaultTone: (defaultTone) => set({ defaultTone }),
       resetToForm: () => set({ step: 0 as const, results: null, currentProperty: null, error: null, progress: 0, progressLabel: '' }),
       clearResults: () => set({ results: null }),
 
+      async fetchCredits() {
+        const credits = await getCredits(get().sessionId);
+        set({ credits });
+      },
+
       async generate(property: PropertyInput) {
-        const config: AIConfig = { provider: get().provider, apiKey: get().apiKey, model: get().model };
-
-        if (!config.apiKey) {
-          set({ error: 'No API key configured. Add one in Settings.' });
-          return;
-        }
-
         set({
-          step: 1 as const, isGenerating: true, progress: 0, progressLabel: 'Starting...',
+          step: 1 as const, isGenerating: true, progress: 10, progressLabel: 'Sending to AI...',
           error: null, currentProperty: property, results: null,
         });
 
-        const system = SYSTEM_PROMPT;
-        let completedCount = 0;
-        const totalCalls = 5;
+        try {
+          // Animate progress while waiting
+          const progressInterval = setInterval(() => {
+            const current = get().progress;
+            if (current < 85) {
+              set({ progress: current + Math.random() * 8, progressLabel: 'Generating your marketing kit...' });
+            }
+          }, 800);
 
-        const tick = (label: string) => {
-          completedCount++;
-          set({ progress: Math.round((completedCount / totalCalls) * 100), progressLabel: label });
-        };
+          const { results, credits } = await generateViaProxy(property, get().sessionId);
 
-        // Token limits per output type — social (3 posts) and video (scripted) need more room
-        const TOKEN_LIMITS = { mls: 1024, social: 2048, email: 1024, flyer: 1024, video: 2048 } as const;
+          clearInterval(progressInterval);
 
-        // Batch 1: MLS + Social + Email in parallel
-        const mlsP = generateContent(config, system, buildMlsPrompt(property), TOKEN_LIMITS.mls).then(r => { tick('MLS description ready...'); return r; });
-        const socialP = generateContent(config, system, buildSocialPrompt(property), TOKEN_LIMITS.social).then(r => { tick('Social posts ready...'); return r; });
-        const emailP = generateContent(config, system, buildEmailPrompt(property), TOKEN_LIMITS.email).then(r => { tick('Email blast ready...'); return r; });
-
-        const [mlsRaw, socialRaw, emailRaw] = await Promise.allSettled([mlsP, socialP, emailP]);
-
-        // Batch 2: Flyer + Video in parallel
-        const flyerP = generateContent(config, system, buildFlyerPrompt(property), TOKEN_LIMITS.flyer).then(r => { tick('Flyer ready...'); return r; });
-        const videoP = generateContent(config, system, buildVideoPrompt(property), TOKEN_LIMITS.video).then(r => { tick('Video script ready...'); return r; });
-
-        const [flyerRaw, videoRaw] = await Promise.allSettled([flyerP, videoP]);
-
-        // Unwrap PromiseSettledResult into AIOutput
-        const unwrap = (settled: PromiseSettledResult<AIOutput>): AIOutput => {
-          if (settled.status === 'rejected') {
-            return { status: 'error', message: settled.reason?.message || 'Request failed' };
+          set({
+            results,
+            credits,
+            isGenerating: false,
+            step: 2 as const,
+            progress: 100,
+            progressLabel: 'Complete!',
+          });
+          addToHistory({ id: generateId(), generatedAt: results.generatedAt, property, results });
+        } catch (err) {
+          set({ isGenerating: false, step: 0 as const, progress: 0, progressLabel: '' });
+          if (err instanceof Error && err.message === 'NO_CREDITS') {
+            set({ error: 'NO_CREDITS' });
+          } else {
+            set({ error: err instanceof Error ? err.message : 'Generation failed' });
           }
-          return settled.value;
-        };
-
-        // Social: unwrap then parse
-        const socialUnwrapped = unwrap(socialRaw);
-        const socialResult: SocialOutput = socialUnwrapped.status === 'success'
-          ? { status: 'success', posts: parseSocialOutput(socialUnwrapped.text) }
-          : socialUnwrapped as SocialOutput;
-
-        // Email: unwrap then parse
-        const emailUnwrapped = unwrap(emailRaw);
-        const emailResult: EmailOutput = emailUnwrapped.status === 'success'
-          ? { status: 'success', parsed: parseEmailOutput(emailUnwrapped.text), raw: emailUnwrapped.text }
-          : emailUnwrapped as EmailOutput;
-
-        const results: GenerationResult = {
-          mls: unwrap(mlsRaw),
-          social: socialResult,
-          email: emailResult,
-          flyer: unwrap(flyerRaw),
-          video: unwrap(videoRaw),
-          generatedAt: new Date().toISOString(),
-          property,
-        };
-
-        set({ results, isGenerating: false, step: 2 as const, progress: 100, progressLabel: 'Complete!' });
-        addToHistory({ id: generateId(), generatedAt: results.generatedAt, property, results });
+        }
       },
 
       async regenerateOutput(outputKey: 'mls' | 'social' | 'email' | 'flyer' | 'video') {
@@ -134,7 +104,7 @@ export const useAppStore = create<AppState>()(
         const results = get().results;
         if (!property || !results) return;
 
-        // Set this specific output to loading state immediately
+        // Set this specific output to loading state
         const loading = { ...results };
         if (outputKey === 'social') {
           loading.social = { status: 'loading' as const };
@@ -145,35 +115,37 @@ export const useAppStore = create<AppState>()(
         }
         set({ results: loading });
 
-        // Make the API call
-        const config: AIConfig = { provider: get().provider, apiKey: get().apiKey, model: get().model };
-        const promptMap = { mls: buildMlsPrompt, social: buildSocialPrompt, email: buildEmailPrompt, flyer: buildFlyerPrompt, video: buildVideoPrompt };
-        const tokenLimits = { mls: 1024, social: 2048, email: 1024, flyer: 1024, video: 2048 } as const;
-        const raw = await generateContent(config, SYSTEM_PROMPT, promptMap[outputKey](property), tokenLimits[outputKey]);
+        try {
+          const output = await regenerateViaProxy(property, outputKey, get().sessionId);
 
-        // Get fresh results reference
-        const updated = { ...get().results! };
-        if (outputKey === 'social') {
-          updated.social = raw.status === 'success'
-            ? { status: 'success' as const, posts: parseSocialOutput(raw.text) }
-            : { status: 'error' as const, message: raw.status === 'error' ? raw.message : 'Failed' };
-        } else if (outputKey === 'email') {
-          updated.email = raw.status === 'success'
-            ? { status: 'success' as const, parsed: parseEmailOutput(raw.text), raw: raw.text }
-            : { status: 'error' as const, message: raw.status === 'error' ? raw.message : 'Failed' };
-        } else {
-          updated[outputKey] = raw;
+          const updated = { ...get().results! };
+          if (outputKey === 'social') {
+            updated.social = output as SocialOutput;
+          } else if (outputKey === 'email') {
+            updated.email = output as EmailOutput;
+          } else {
+            updated[outputKey] = output as typeof updated.mls;
+          }
+          set({ results: updated });
+        } catch (err) {
+          const updated = { ...get().results! };
+          const message = err instanceof Error ? err.message : 'Regeneration failed';
+          if (outputKey === 'social') {
+            updated.social = { status: 'error' as const, message };
+          } else if (outputKey === 'email') {
+            updated.email = { status: 'error' as const, message };
+          } else {
+            updated[outputKey] = { status: 'error' as const, message };
+          }
+          set({ results: updated });
         }
-        set({ results: updated });
       },
     }),
     {
       name: 'listingkit-storage',
       storage: createJSONStorage(() => safeStorage),
       partialize: (state) => ({
-        apiKey: state.apiKey,
-        provider: state.provider,
-        model: state.model,
+        sessionId: state.sessionId,
         agentName: state.agentName,
         brokerageName: state.brokerageName,
         defaultTone: state.defaultTone,

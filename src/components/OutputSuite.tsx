@@ -39,10 +39,7 @@ export default function OutputSuite({ results, showGenerateAnother = false }: Pr
       {allFailed && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
           <p className="text-red-700 text-sm font-medium">
-            All outputs failed. This usually means your API key is invalid or expired.{' '}
-            <a href="/#/settings" className="underline font-semibold hover:text-red-800">
-              Check your key in Settings
-            </a>
+            All outputs failed. The AI service may be temporarily unavailable. Please try again in a moment.
           </p>
         </div>
       )}
