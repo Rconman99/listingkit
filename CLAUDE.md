@@ -1024,3 +1024,9 @@ html2canvas is NOT installed. PDF uses jspdf direct text rendering.
 - .gitignore: node_modules/, dist/, .env*, .DS_Store
 - Commit after each major feature
 - Final commit: "feat: complete ListingKit v1.0"
+
+## Active Skills
+<!-- Auto-detected by ~/.claude/scripts/select-skills.py — update as the project evolves -->
+- react-patterns — component architecture
+- stripe-integration — payment flows
+- frontend-dev-guidelines — UI patterns
