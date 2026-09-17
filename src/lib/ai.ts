@@ -1,4 +1,6 @@
-import { PropertyInput, GenerationResult, CreditInfo } from './types';
+import { PropertyInput, GenerationResult, CreditInfo, OutputKey } from './types';
+
+import { projectGenerationInput } from './publicFacts';
 
 interface GenerateResponse {
   results: GenerationResult;
@@ -16,7 +18,7 @@ export async function generateViaProxy(
   const res = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ property, sessionId }),
+    body: JSON.stringify({ property: projectGenerationInput(property), sessionId }),
   });
 
   if (res.status === 403) {
@@ -38,13 +40,13 @@ export async function generateViaProxy(
 
 export async function regenerateViaProxy(
   property: PropertyInput,
-  outputKey: 'mls' | 'social' | 'email' | 'flyer' | 'video',
+  outputKey: OutputKey,
   sessionId: string
 ): Promise<unknown> {
   const res = await fetch('/api/regenerate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ property, outputKey, sessionId }),
+    body: JSON.stringify({ property: projectGenerationInput(property), outputKey, sessionId }),
   });
 
   if (res.status === 429) {

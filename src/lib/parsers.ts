@@ -1,4 +1,31 @@
-import { SocialPosts, ParsedEmail } from './types';
+import { SocialPosts, ParsedEmail, DistributionAssets, DistributionOutput } from './types';
+
+function exactObject(value: unknown, keys: string[]): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    && Object.keys(value).length === keys.length
+    && keys.every(key => Object.prototype.hasOwnProperty.call(value, key));
+}
+
+function textFields(value: unknown, keys: string[]): boolean {
+  return exactObject(value, keys) && keys.every(key => typeof value[key] === 'string' && value[key].trim().length > 0);
+}
+
+export function isDistributionAssets(value: unknown): value is DistributionAssets {
+  return exactObject(value, ['property_page', 'agent_email', 'youtube_description', 'google_business_post'])
+    && textFields(value.property_page, ['headline', 'summary', 'seo_title', 'meta_description'])
+    && textFields(value.agent_email, ['subject', 'body'])
+    && typeof value.youtube_description === 'string' && value.youtube_description.trim().length > 0
+    && typeof value.google_business_post === 'string' && value.google_business_post.trim().length > 0;
+}
+
+// Fail closed: no partial JSON, markdown fences, unknown keys, or raw-text fallback.
+export function parseDistributionOutput(raw: string): DistributionOutput {
+  try {
+    const assets: unknown = JSON.parse(raw);
+    if (isDistributionAssets(assets)) return { status: 'success', assets };
+  } catch { /* Return a fixed message; never echo an untrusted model response. */ }
+  return { status: 'error', message: 'Distribution output was invalid. Regenerate distribution to try again.' };
+}
 
 export function parseSocialOutput(raw: string): SocialPosts {
   // Primary: split on delimiter

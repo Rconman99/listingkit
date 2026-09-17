@@ -22,6 +22,23 @@ export const SAMPLE_PROPERTY: PropertyInput = {
 };
 
 export const SAMPLE_RESULTS: GenerationResult = {
+  distribution: {
+    status: 'success',
+    assets: {
+      property_page: {
+        headline: '123 Maple Drive · Denver',
+        summary: '4 bedrooms, 3 bathrooms and 2,450 square feet, listed at $625,000. Features include an open-concept kitchen with quartz countertops, hardwood floors, a finished basement with wet bar, and a covered patio with mountain views.',
+        seo_title: '123 Maple Drive, Denver CO | 4-Bedroom Home',
+        meta_description: 'Explore 123 Maple Drive in Denver: 4 bedrooms, 3 bathrooms, 2,450 SF, and a covered patio with mountain views. Listed at $625,000.',
+      },
+      agent_email: {
+        subject: 'Listing introduction: 123 Maple Drive, Denver',
+        body: 'Sharing 123 Maple Drive in Denver, CO 80220, listed at $625,000. This 2018 home includes 4 bedrooms, 3 bathrooms, 2,450 square feet, a finished basement with wet bar, and a covered patio with mountain views. Reply to discuss the property. Sarah Mitchell | Front Range Realty',
+      },
+      youtube_description: 'Explore the public listing facts for 123 Maple Drive in Denver: 4 bedrooms, 3 bathrooms, 2,450 square feet, built in 2018. Features include quartz countertops, hardwood floors, and a covered patio with mountain views. Listed at $625,000 by Sarah Mitchell, Front Range Realty.',
+      google_business_post: '123 Maple Drive, Denver, CO 80220: 4 bedrooms, 3 bathrooms and 2,450 square feet, listed at $625,000. Features include an open-concept kitchen with quartz countertops and a finished basement with wet bar. Sarah Mitchell | Front Range Realty.',
+    },
+  },
   mls: {
     status: 'success',
     text: `This stunning 4-bedroom, 3-bathroom home at 123 Maple Drive delivers modern living at its finest with 2,450 square feet of thoughtfully designed space. Step inside to discover an open-concept kitchen featuring quartz countertops and seamless flow into sun-drenched living areas, all complemented by hardwood floors throughout.
