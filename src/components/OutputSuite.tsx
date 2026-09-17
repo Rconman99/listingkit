@@ -5,13 +5,14 @@ import { useAppStore } from '../store/appStore';
 import OutputCard from './OutputCard';
 import CopyButton from './CopyButton';
 import PdfExport from './PdfExport';
+import AssetBundlePanel from './AssetBundlePanel';
 
 interface Props {
   results: GenerationResult;
   showGenerateAnother?: boolean;
 }
 
-type TabKey = 'mls' | 'social' | 'email' | 'flyer' | 'video';
+type TabKey = 'mls' | 'social' | 'email' | 'flyer' | 'video' | 'bundle';
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'mls', label: 'MLS' },
@@ -19,6 +20,7 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: 'email', label: 'Email' },
   { key: 'flyer', label: 'Flyer' },
   { key: 'video', label: 'Video' },
+  { key: 'bundle', label: 'Asset Bundle' },
 ];
 
 export default function OutputSuite({ results, showGenerateAnother = false }: Props) {
@@ -31,7 +33,8 @@ export default function OutputSuite({ results, showGenerateAnother = false }: Pr
     results.social.status === 'error' &&
     results.email.status === 'error' &&
     results.flyer.status === 'error' &&
-    results.video.status === 'error';
+    results.video.status === 'error' &&
+    (!results.distribution || results.distribution.status === 'error');
 
   return (
     <div>
@@ -63,6 +66,7 @@ export default function OutputSuite({ results, showGenerateAnother = false }: Pr
 
       {/* Tab content */}
       <div className="space-y-4">
+        {activeTab === 'bundle' && <AssetBundlePanel results={results} />}
         {activeTab === 'mls' && (
           <OutputCard
             title="MLS Listing Description"

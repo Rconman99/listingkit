@@ -1,15 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getSession, setSession } from './_lib/redis';
 import { callGemini } from './_lib/gemini';
-import { SYSTEM_PROMPT, buildMlsPrompt, buildSocialPrompt, buildEmailPrompt, buildFlyerPrompt, buildVideoPrompt } from '../src/lib/prompts';
-import { parseSocialOutput, parseEmailOutput } from '../src/lib/parsers';
+import { SYSTEM_PROMPT, buildMlsPrompt, buildSocialPrompt, buildEmailPrompt, buildFlyerPrompt, buildVideoPrompt, buildDistributionPrompt } from '../src/lib/prompts';
+import { parseSocialOutput, parseEmailOutput, parseDistributionOutput } from '../src/lib/parsers';
+import { projectGenerationInput, GENERATOR_VERSION, GENERATION_MODEL } from '../src/lib/publicFacts';
 import type { PropertyInput } from '../src/lib/types';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { property, sessionId } = req.body as { property: PropertyInput; sessionId: string };
-  if (!property || !sessionId) return res.status(400).json({ error: 'Missing property or sessionId' });
+  const { property: suppliedProperty, sessionId } = req.body as { property: PropertyInput; sessionId: string };
+  if (!suppliedProperty || !sessionId) return res.status(400).json({ error: 'Missing property or sessionId' });
+
+  const property = projectGenerationInput(suppliedProperty);
 
   // Check credits
   const session = await getSession(sessionId);
@@ -20,14 +23,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // Fire all 5 Gemini calls in parallel
+  // Fire all 6 Gemini calls in parallel
   const system = SYSTEM_PROMPT;
-  const [mlsRes, socialRes, emailRes, flyerRes, videoRes] = await Promise.allSettled([
+  const [mlsRes, socialRes, emailRes, flyerRes, videoRes, distributionRes] = await Promise.allSettled([
     callGemini(system, buildMlsPrompt(property)),
     callGemini(system, buildSocialPrompt(property)),
     callGemini(system, buildEmailPrompt(property)),
     callGemini(system, buildFlyerPrompt(property)),
     callGemini(system, buildVideoPrompt(property)),
+    callGemini(system, buildDistributionPrompt(property), { structured: true }),
   ]);
 
   const unwrap = (settled: PromiseSettledResult<Awaited<ReturnType<typeof callGemini>>>) => {
@@ -40,9 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const email = unwrap(emailRes);
   const flyer = unwrap(flyerRes);
   const video = unwrap(videoRes);
+  const distribution = unwrap(distributionRes);
 
   // If any call was rate limited, don't deduct credit
-  const anyRateLimited = [mls, social, email, flyer, video].some(r => r.status === 'rate_limited');
+  const anyRateLimited = [mls, social, email, flyer, video, distribution].some(r => r.status === 'rate_limited');
   if (anyRateLimited) {
     return res.status(429).json({ error: 'AI rate limited — try again in a minute. No credit was used.' });
   }
@@ -79,6 +84,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       email: emailOutput,
       flyer: flyerOutput,
       video: videoOutput,
+      distribution: distribution.status === 'success'
+        ? parseDistributionOutput(distribution.text!)
+        : { status: 'error', message: 'Distribution generation failed. Please retry.' },
+      generationInfo: { generator_version: GENERATOR_VERSION, model: GENERATION_MODEL },
       generatedAt: new Date().toISOString(),
       property,
     },

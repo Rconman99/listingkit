@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
-import { PropertyInput } from '../lib/types';
+import { PropertyInput, OutputKey } from '../lib/types';
 
 export function useGenerate() {
   const store = useAppStore();
@@ -22,7 +22,7 @@ export function useGenerate() {
     await store.generate(property);
   }, [store, validate]);
 
-  const regenerate = useCallback(async (outputKey: 'mls' | 'social' | 'email' | 'flyer' | 'video') => {
+  const regenerate = useCallback(async (outputKey: OutputKey) => {
     await store.regenerateOutput(outputKey);
   }, [store]);
 
